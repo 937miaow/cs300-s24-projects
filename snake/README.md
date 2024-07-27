@@ -6,6 +6,7 @@ CSCI 0300 Project 1 - Snake
 ## Collaborators:
 
 ## Responsible Computing:
+
 Partner CS login:
 
 ## Extra Credit attempted:

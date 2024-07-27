@@ -7,11 +7,11 @@
 // students looking through the provided code.
 
 // Bitflags enable us to store cell data in integers!
-#define PLAIN_CELL 0b0000      // equals 0
-#define FLAG_SNAKE 0b0001      // equals 1
-#define FLAG_WALL  0b0010      // equals 2
-#define FLAG_FOOD  0b0100      // equals 4
-#define FLAG_GRASS 0b1000      // equals 8
+#define PLAIN_CELL 0b0000  // equals 0
+#define FLAG_SNAKE 0b0001  // equals 1
+#define FLAG_WALL 0b0010   // equals 2
+#define FLAG_FOOD 0b0100   // equals 4
+#define FLAG_GRASS 0b1000  // equals 8
 
 /**
  * Enumerated types, also known as "enums", are a way to create a set of named
@@ -43,6 +43,9 @@ extern int g_score;      // game score: 1 point for every food eaten
  */
 typedef struct snake {
     // TODO: Define your snake struct! (in ')
+    int direction;
+    int x;
+    int y;
     // Store any necessary information about your snake here.
 } snake_t;
 

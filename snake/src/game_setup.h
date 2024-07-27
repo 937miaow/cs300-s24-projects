@@ -16,10 +16,13 @@ enum board_init_status {
                                     // correctly, or too many rows/columns are
                                     // specified anywhere in the string for the
                                     // given dimensions
+                                    // 维度描述的格式不正确，或者在给定维度的字符串中的任何位置指定了太多的行/列
     INIT_ERR_WRONG_SNAKE_NUM,  // no snake or multiple snakes are on the board
     INIT_ERR_BAD_CHAR,  // any other part of the compressed string was formatted
                         // incorrectly
+                        // 压缩字符串的任何其他部分的格式都不正确
     INIT_UNIMPLEMENTED  // only used in stencil, no need to handle this
+                        // 仅用于模板 无需处理
 };
 
 enum board_init_status initialize_game(int** cells_p, size_t* width_p,
