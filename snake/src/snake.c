@@ -1,16 +1,16 @@
 #define _XOPEN_SOURCE_EXTENDED 1
 #include <curses.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <stddef.h>
 
+#include "common.h"
 #include "game.h"
 #include "game_over.h"
 #include "game_setup.h"
 #include "mbstrings.h"
 #include "render.h"
-#include "common.h"
 
 /** Gets the next input from the user, or returns INPUT_NONE if no input is
  * provided quickly enough.
@@ -127,7 +127,13 @@ int main(int argc, char** argv) {
         "   __________/ /    \n"
         "-=:___________/\n");
 
-    // initialize_window(width, height);
+    initialize_window(width, height);
     // TODO: implement the game loop here (Part 1A)!
-    // end_game(cells, width, height, &snake);
+    while (!g_game_over) {
+        render_game(cells, width, height);
+        enum input_key input = get_input();
+        update(cells, width, height, NULL, input, 0);
+        usleep(1000 * 1000);  // 1000ms
+    }
+    end_game(cells, width, height, &snake);
 }

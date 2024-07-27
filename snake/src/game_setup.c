@@ -1,12 +1,12 @@
 #include "game_setup.h"
 
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stddef.h>
 
-#include "game.h"
 #include "common.h"
+#include "game.h"
 
 // Some handy dandy macros for decompression
 #define E_CAP_HEX 0x45
@@ -91,8 +91,15 @@ enum board_init_status initialize_game(int** cells_p, size_t* width_p,
                                        size_t* height_p, snake_t* snake_p,
                                        char* board_rep) {
     // TODO: implement!
+    g_game_over = 0;
+    g_score = 0;
+    enum board_init_status result;
 
-    return INIT_SUCCESS;
+    if (board_rep == NULL) {
+        result = initialize_default_board(cells_p, width_p, height_p);
+    }
+
+    return result;
 }
 
 /** Takes in a string `compressed` and initializes values pointed to by
