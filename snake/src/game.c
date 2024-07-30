@@ -45,31 +45,48 @@ void update(int* cells, size_t width, size_t height, snake_t* snake_p,
         }
     }
     // 根据输入方向，计算蛇头的新位置
-    // // 但现在默认往右移动一格
-    // int new_head_index = head_index + 1;
-
     int new_head_index = -1;
     switch (input) {
         case INPUT_UP:
             new_head_index = head_index - (int)width;
+            g_snake_lastdire = UP;
             break;
         case INPUT_DOWN:
             new_head_index = head_index + (int)width;
+            g_snake_lastdire = DOWN;
             break;
         case INPUT_LEFT:
             new_head_index = head_index - 1;
+            g_snake_lastdire = LEFT;
             break;
         case INPUT_RIGHT:
             new_head_index = head_index + 1;
+            g_snake_lastdire = RIGHT;
             break;
         case INPUT_NONE:
-            new_head_index = head_index + 1;
+            switch (g_snake_lastdire) {
+                case UP:
+                    new_head_index = head_index - (int)width;
+                    break;
+                case DOWN:
+                    new_head_index = head_index + (int)width;
+                    break;
+                case LEFT:
+                    new_head_index = head_index - 1;
+                    break;
+                case RIGHT:
+                    new_head_index = head_index + 1;
+                    break;
+            }
             break;
     }
 
     // bool has_snake = cells_state & FLAG_SNAKE;
 
     // 更新蛇的位置
+    // 之后如果要用head指针来写的话
+    // 记得每个snake_t都要有一个head指针，指向下一个方向
+
     // 蛇与草重叠
     if (cells[new_head_index] & FLAG_GRASS) {
         cells[new_head_index] = FLAG_SNAKE | FLAG_GRASS;
