@@ -87,19 +87,30 @@ void update(int* cells, size_t width, size_t height, snake_t* snake_p,
     // 之后如果要用head指针来写的话
     // 记得每个snake_t都要有一个head指针，指向下一个方向
 
-    // 蛇与草重叠
-    if (cells[new_head_index] & FLAG_GRASS) {
-        cells[new_head_index] = FLAG_SNAKE | FLAG_GRASS;
-        cells[head_index] = cells[head_index] ^ FLAG_SNAKE;
-    }
-    // 蛇碰到墙
-    else if (cells[new_head_index] & FLAG_WALL) {
-        g_game_over = 1;
-    }
-    // 普通情况
-    else if (cells[new_head_index] == PLAIN_CELL) {
-        cells[new_head_index] = FLAG_SNAKE;
-        cells[head_index] = cells[head_index] ^ FLAG_SNAKE;
+    switch (cells[new_head_index]) {
+        case FLAG_WALL:  // 撞墙
+            g_game_over = 1;
+            break;
+        case FLAG_FOOD:  // 吃到食物
+            g_score++;
+            cells[new_head_index] = FLAG_SNAKE;
+            cells[head_index] = cells[head_index] ^ FLAG_SNAKE;
+            place_food(cells, width, height);
+            break;
+        case FLAG_GRASS:  // 草地
+            cells[new_head_index] = FLAG_SNAKE | FLAG_GRASS;
+            cells[head_index] = cells[head_index] ^ FLAG_SNAKE;
+            break;
+        case PLAIN_CELL:  // 空地
+            cells[new_head_index] = FLAG_SNAKE;
+            cells[head_index] = cells[head_index] ^ FLAG_SNAKE;
+            break;
+        case FLAG_FOOD | FLAG_GRASS:  // 在草里吃到食物
+            g_score++;
+            cells[new_head_index] = FLAG_SNAKE | FLAG_GRASS;
+            cells[head_index] = cells[head_index] ^ FLAG_SNAKE;
+            place_food(cells, width, height);
+            break;
     }
 }
 
