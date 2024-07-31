@@ -97,8 +97,11 @@ enum board_init_status initialize_game(int** cells_p, size_t* width_p,
 
     if (board_rep == NULL) {
         result = initialize_default_board(cells_p, width_p, height_p);
+    } else {
+        result = decompress_board_str(cells_p, width_p, height_p, snake_p,
+                                      board_rep);
     }
-    place_food(*cells_p, *width_p, *height_p);
+    if (result == INIT_SUCCESS) place_food(*cells_p, *width_p, *height_p);
 
     return result;
 }
@@ -120,5 +123,258 @@ enum board_init_status decompress_board_str(int** cells_p, size_t* width_p,
                                             size_t* height_p, snake_t* snake_p,
                                             char* compressed) {
     // TODO: implement!
-    return INIT_UNIMPLEMENTED;
+    // 用于`strtok_r`的指针
+    char* token;
+    char* rest = compressed;
+
+    // 动态数组用于存储子字符串指针
+    char** tokens = NULL;
+    size_t cnt = 0;
+
+    // 分割字符串
+    while ((token = strtok_r(rest, "|", &rest))) {
+        // 重新分配空间
+        tokens = realloc(tokens, sizeof(char*) * (cnt + 1));
+        if (tokens == NULL) exit(EXIT_FAILURE);
+
+        // 分配空间并复制子字符串
+        tokens[cnt] = malloc(strlen(token) + 1);
+        if (tokens[cnt] == NULL) exit(EXIT_FAILURE);
+        strcpy(tokens[cnt], token);
+
+        // 计数器加一
+        cnt++;
+
+        // 记得free！！！！
+    }
+
+    // 初始化board
+    char* left = tokens[0];
+    char* right = tokens[0];
+    int lentoken0 = strlen(tokens[0]);
+    // 获取宽高 第一个字符串正确格式是类似于B24x80
+    for (int i = 0; i < lentoken0; ++i) {
+        char c = tokens[0][i];
+        if (c != 'B' && c != 'x' && (c < '0' || c > '9')) {
+            for (size_t l = 0; l < cnt; l++) {
+                free(tokens[l]);
+            }
+            free(tokens);
+            return INIT_ERR_BAD_CHAR;
+        }
+
+        if (c == 'B') {
+            left = &tokens[0][i + 1];
+        } else if (c == 'x') {
+            right = &tokens[0][i];
+            break;
+        }
+    }
+    int height_len = right - left;
+    char* height_temp = strndup(left, height_len);
+    char* width_temp = strdup(right + 1);
+    *height_p = atoi(height_temp);
+    *width_p = atoi(width_temp);
+
+    int height = *height_p;
+    int width = *width_p;
+    int* cells = malloc(height * width * sizeof(int));
+
+    free(height_temp);
+    free(width_temp);
+
+    *cells_p = cells;
+    for (int i = 0; i < height * width; i++) {
+        cells[i] = PLAIN_CELL;
+    }
+
+    // 读取每一段字符串
+    left = tokens[0];
+    right = tokens[0];
+
+    int height_cnt = 0;
+    int snake_num = 0;  // 记录蛇的数量
+
+    for (size_t i = 1; i < cnt; i++) {
+        int substr_len = strlen(tokens[i]);
+        height_cnt++;
+        if (height_cnt > height) {
+            for (size_t l = 0; l < cnt; l++) {
+                free(tokens[l]);
+            }
+            free(tokens);
+            return INIT_ERR_INCORRECT_DIMENSIONS;
+        }
+        int width_cnt = 0;
+
+        for (int j = 0; j < substr_len; j++) {
+            // 读取字符
+            char c = tokens[i][j];
+            switch (c) {
+                case 'E': {
+                    // 读取数字
+                    left = tokens[i] + j + 1;
+                    j++;
+                    while (tokens[i][j] >= DIGIT_START &&
+                           tokens[i][j] <= DIGIT_END) {
+                        j++;
+                    }
+                    right = tokens[i] + j - 1;
+
+                    // 分配内存
+                    char* num = strndup(left, right - left + 1);
+                    int num_int = atoi(num);
+                    width_cnt += num_int;
+                    if (width_cnt > width) {
+                        free(num);
+                        for (size_t l = 0; l < cnt; l++) {
+                            free(tokens[l]);
+                        }
+                        free(tokens);
+                        return INIT_ERR_INCORRECT_DIMENSIONS;
+                    }
+                    for (int k = 0; k < num_int; ++k) {
+                        *(cells + (height_cnt - 1) * width + width_cnt -
+                          num_int + k) = PLAIN_CELL;
+                    }
+                    free(num);
+
+                    // 将j移动至右指针,以便下一次读取到正确的字母，否则会直接跳到default
+                    j = right - tokens[i];
+
+                    break;
+                }
+
+                case 'S': {
+                    left = tokens[i] + j + 1;
+                    j++;
+                    while (tokens[i][j] >= DIGIT_START &&
+                           tokens[i][j] <= DIGIT_END) {
+                        j++;
+                    }
+                    right = tokens[i] + j - 1;
+
+                    char* num = strndup(left, right - left + 1);
+                    int num_int = atoi(num);
+                    width_cnt += num_int;
+                    snake_num += num_int;
+                    if (width_cnt > width) {
+                        free(num);
+                        for (size_t l = 0; l < cnt; l++) {
+                            free(tokens[l]);
+                        }
+                        free(tokens);
+                        return INIT_ERR_INCORRECT_DIMENSIONS;
+                    }
+                    for (int k = 0; k < num_int; ++k) {
+                        *(cells + (height_cnt - 1) * width + width_cnt -
+                          num_int + k) = FLAG_SNAKE;
+                    }
+                    free(num);
+
+                    j = right - tokens[i];
+
+                    break;
+                }
+
+                case 'W': {
+                    left = tokens[i] + j + 1;
+                    j++;
+                    while (tokens[i][j] >= DIGIT_START &&
+                           tokens[i][j] <= DIGIT_END) {
+                        j++;
+                    }
+                    right = tokens[i] + j - 1;
+
+                    char* num = strndup(left, right - left + 1);
+                    int num_int = atoi(num);
+                    width_cnt += num_int;
+                    if (width_cnt > width) {
+                        free(num);
+                        for (size_t l = 0; l < cnt; l++) {
+                            free(tokens[l]);
+                        }
+                        free(tokens);
+                        return INIT_ERR_INCORRECT_DIMENSIONS;
+                    }
+                    for (int k = 0; k < num_int; ++k) {
+                        *(cells + (height_cnt - 1) * width + width_cnt -
+                          num_int + k) = FLAG_WALL;
+                    }
+                    free(num);
+
+                    j = right - tokens[i];
+
+                    break;
+                }
+
+                case 'G': {
+                    left = tokens[i] + j + 1;
+                    j++;
+                    while (tokens[i][j] >= DIGIT_START &&
+                           tokens[i][j] <= DIGIT_END) {
+                        j++;
+                    }
+                    right = tokens[i] + j - 1;
+
+                    char* num = strndup(left, right - left + 1);
+                    int num_int = atoi(num);
+                    width_cnt += num_int;
+                    if (width_cnt > width) {
+                        free(num);
+                        for (size_t l = 0; l < cnt; l++) {
+                            free(tokens[l]);
+                        }
+                        free(tokens);
+                        return INIT_ERR_INCORRECT_DIMENSIONS;
+                    }
+                    for (int k = 0; k < num_int; ++k) {
+                        *(cells + (height_cnt - 1) * width + width_cnt -
+                          num_int + k) = FLAG_GRASS;
+                    }
+                    free(num);
+
+                    j = right - tokens[i];
+
+                    break;
+                }
+                default:
+                    for (size_t l = 0; l < cnt; l++) {
+                        free(tokens[l]);
+                    }
+                    free(tokens);
+                    return INIT_ERR_BAD_CHAR;
+            }
+        }
+
+        if (width_cnt != width) {
+            for (size_t l = 0; l < cnt; l++) {
+                free(tokens[l]);
+            }
+            free(tokens);
+            return INIT_ERR_INCORRECT_DIMENSIONS;
+        }
+    }
+    if (height_cnt != height) {
+        for (size_t l = 0; l < cnt; l++) {
+            free(tokens[l]);
+        }
+        free(tokens);
+        return INIT_ERR_INCORRECT_DIMENSIONS;
+    }
+    if (snake_num != 1) {
+        for (size_t l = 0; l < cnt; l++) {
+            free(tokens[l]);
+        }
+        free(tokens);
+        return INIT_ERR_WRONG_SNAKE_NUM;
+    }
+
+    // 释放内存
+    for (size_t i = 0; i < cnt; i++) {
+        free(tokens[i]);
+    }
+    free(tokens);
+
+    return INIT_SUCCESS;
 }
