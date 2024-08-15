@@ -8,8 +8,8 @@
 struct dmalloc_stats global_stats = {0, 0, 0, 0, 0, 0, (uintptr_t)-1, 0};
 std::unordered_map<void*, BlockInfo> allocated_blocks;
 
-void track_allocation(void* ptr, size_t size) {
-    allocated_blocks[ptr] = {size, true};
+void track_allocation(void* ptr, size_t size, const char* file, long line) {
+    allocated_blocks[ptr] = {size, true, file, line};
 }
 
 bool find_allocation(void* ptr) {
@@ -21,6 +21,10 @@ size_t get_allocation_size(void* ptr) { return allocated_blocks[ptr].size; }
 bool is_in_use(void* ptr) { return allocated_blocks[ptr].in_use; }
 
 void set_free(void* ptr) { allocated_blocks[ptr].in_use = false; }
+
+char* get_file(void* ptr) { return (char*)allocated_blocks[ptr].file; }
+
+long get_line(void* ptr) { return allocated_blocks[ptr].line; }
 
 /**
  * dmalloc(sz,file,line)
@@ -38,15 +42,16 @@ void* dmalloc(size_t sz, const char* file, long line) {
     (void)file, (void)line;  // avoid uninitialized variable warnings
     // Your code here.
     // 检查是否溢出
-    if (sz > SIZE_MAX) {
+    if (sz > SIZE_MAX - sizeof(int)) {
         global_stats.nfail++;
         global_stats.fail_size += sz;
         return NULL;
     }
+    size_t total_size = sz + sizeof(int);
 
-    void* ptr = base_malloc(sz);
+    void* ptr = base_malloc(total_size);
     if (ptr) {
-        track_allocation(ptr, sz);
+        track_allocation(ptr, sz, file, line);
         global_stats.nactive++;
         global_stats.active_size += sz;
         global_stats.ntotal++;
@@ -56,14 +61,17 @@ void* dmalloc(size_t sz, const char* file, long line) {
         if (addr < global_stats.heap_min) {
             global_stats.heap_min = addr;
         }
-        if (addr + sz > global_stats.heap_max) {
-            global_stats.heap_max = addr + sz;
+        if (addr + total_size > global_stats.heap_max) {
+            global_stats.heap_max = addr + total_size;
         }
     } else {
         global_stats.nfail++;
         global_stats.fail_size += sz;
         return NULL;
     }
+
+    int pattern = 114514;  // 设定一个已知的模式值
+    memcpy((char*)ptr + sz, &pattern, sizeof(pattern));
     return ptr;
 }
 
@@ -103,7 +111,15 @@ void dfree(void* ptr, const char* file, long line) {
         fprintf(stderr, "MEMORY BUG: invalid free of pointer %p, double free",
                 ptr);
         abort();
-        return;
+    }
+    // boundary error
+    size_t sz = get_allocation_size(ptr);  // have a question???
+    int pattern = 114514;
+    if (memcmp((char*)ptr + sz, &pattern, sizeof(pattern)) != 0) {
+        fprintf(stderr,
+                "MEMORY BUG: detected wild write during free of pointer %p",
+                ptr);
+        abort();
     }
     global_stats.nactive--;
     global_stats.active_size -= get_allocation_size(ptr);
@@ -176,4 +192,14 @@ void print_statistics() {
  */
 void print_leak_report() {
     // Your code here.
+    for (auto& it : allocated_blocks) {
+        if (!it.second.in_use) continue;
+        void* ptr = it.first;
+        size_t sz = it.second.size;
+        char* file = (char*)it.second.file;
+        long line = it.second.line;
+        fprintf(stderr,
+                "LEAK CHECK: %s:%ld: allocated object %p with size %lu\n", file,
+                line, ptr, sz);
+    }
 }

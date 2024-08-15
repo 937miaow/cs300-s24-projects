@@ -66,6 +66,8 @@ extern struct dmalloc_stats global_stats;
 struct BlockInfo {
     size_t size;
     bool in_use;
+    const char* file;
+    long line;
 };
 
 /**
