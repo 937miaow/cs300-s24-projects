@@ -6,7 +6,7 @@
 #include <unordered_map>
 
 struct dmalloc_stats global_stats = {0, 0, 0, 0, 0, 0, (uintptr_t)-1, 0};
-std::unordered_map<void*, BlockInfo> allocated_blocks;
+static std::unordered_map<void*, BlockInfo> allocated_blocks;
 
 void track_allocation(void* ptr, size_t size, const char* file, long line) {
     allocated_blocks[ptr] = {size, true, file, line};
@@ -161,7 +161,7 @@ void dfree(void* ptr, const char* file, long line) {
 
     global_stats.nactive--;
     global_stats.active_size -= get_allocation_size(ptr);
-    set_free(ptr);  // 修改hashtable
+    set_free(ptr);
     base_free(ptr);
 }
 /**
