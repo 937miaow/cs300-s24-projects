@@ -12,10 +12,6 @@ void track_allocation(void* ptr, size_t size, const char* file, long line) {
     allocated_blocks[ptr] = {size, true, file, line};
 }
 
-bool find_allocation(void* ptr) {
-    return allocated_blocks.find(ptr) != allocated_blocks.end();
-}
-
 size_t get_allocation_size(void* ptr) { return allocated_blocks[ptr].size; }
 
 bool is_in_use(void* ptr) { return allocated_blocks[ptr].in_use; }
@@ -25,6 +21,23 @@ void set_free(void* ptr) { allocated_blocks[ptr].in_use = false; }
 char* get_file(void* ptr) { return (char*)allocated_blocks[ptr].file; }
 
 long get_line(void* ptr) { return allocated_blocks[ptr].line; }
+
+bool find_allocation(void* ptr) {
+    return allocated_blocks.find(ptr) != allocated_blocks.end();
+}
+
+void* find_allocation_containing(void* ptr) {
+    for (const auto& entry : allocated_blocks) {
+        void* alloc_ptr = entry.first;
+        size_t alloc_size = entry.second.size;
+
+        // 检查指针是否在这个内存块内
+        if (ptr >= alloc_ptr && ptr < (void*)((char*)alloc_ptr + alloc_size)) {
+            return alloc_ptr;  // 返回内存块的起始地址
+        }
+    }
+    return nullptr;  // 没有找到指针位于任何已分配的内存块内
+}
 
 /**
  * dmalloc(sz,file,line)
@@ -92,6 +105,7 @@ void dfree(void* ptr, const char* file, long line) {
     if (!ptr) {
         return;
     }
+
     // not in heap
     if (ptr < (void*)global_stats.heap_min ||
         ptr >= (void*)global_stats.heap_max) {
@@ -99,19 +113,42 @@ void dfree(void* ptr, const char* file, long line) {
                 ptr);
         abort();
     }
+
     // not allocated
     if (!find_allocation(ptr)) {
-        fprintf(stderr,
+        // 查找包含该指针的块
+        void* containing_ptr = find_allocation_containing(ptr);
+        if (!containing_ptr) {
+            fprintf(
+                stderr,
                 "MEMORY BUG: %s:%ld: invalid free of pointer %p, not allocated",
                 file, line, ptr);
-        abort();
+            abort();
+        }
+        // 检查指针是否是块的起始地址
+        if (containing_ptr != ptr) {
+            fprintf(stderr,
+                    "MEMORY BUG: %s:%ld: invalid free of pointer %p, not "
+                    "allocated\n",
+                    file, line, ptr);
+            fprintf(
+                stderr,
+                "%s:%ld: %p is %ld bytes inside a %zu byte region allocated "
+                "here\n ",
+                file, get_line(containing_ptr), ptr,
+                (char*)ptr - (char*)containing_ptr,
+                get_allocation_size(containing_ptr));
+            abort();
+        }
     }
+
     // double free
     if (!is_in_use(ptr)) {
         fprintf(stderr, "MEMORY BUG: invalid free of pointer %p, double free",
                 ptr);
         abort();
     }
+
     // boundary error
     size_t sz = get_allocation_size(ptr);  // have a question???
     int pattern = 114514;
@@ -121,10 +158,10 @@ void dfree(void* ptr, const char* file, long line) {
                 ptr);
         abort();
     }
+
     global_stats.nactive--;
     global_stats.active_size -= get_allocation_size(ptr);
     set_free(ptr);  // 修改hashtable
-
     base_free(ptr);
 }
 /**
