@@ -5,27 +5,37 @@
 #include <cstring>
 #include <unordered_map>
 
+// 初始化全局统计信息
 struct dmalloc_stats global_stats = {0, 0, 0, 0, 0, 0, (uintptr_t)-1, 0};
+// 哈希表，存储已分配的内存块
 static std::unordered_map<void*, BlockInfo> allocated_blocks;
 
+// 跟踪内存分配，记录信息
 void track_allocation(void* ptr, size_t size, const char* file, long line) {
     allocated_blocks[ptr] = {size, true, file, line};
 }
 
+// 获取内存块大小
 size_t get_allocation_size(void* ptr) { return allocated_blocks[ptr].size; }
 
+// 获取内存块是否在使用
 bool is_in_use(void* ptr) { return allocated_blocks[ptr].in_use; }
 
+// 设置内存块未使用
 void set_free(void* ptr) { allocated_blocks[ptr].in_use = false; }
 
+// 获取内存块的文件名
 char* get_file(void* ptr) { return (char*)allocated_blocks[ptr].file; }
 
+// 获取内存块的行号
 long get_line(void* ptr) { return allocated_blocks[ptr].line; }
 
+// 查找内存块是否已分配
 bool find_allocation(void* ptr) {
     return allocated_blocks.find(ptr) != allocated_blocks.end();
 }
 
+// 查找包含指定指针的内存块
 void* find_allocation_containing(void* ptr) {
     for (const auto& entry : allocated_blocks) {
         void* alloc_ptr = entry.first;
@@ -60,6 +70,7 @@ void* dmalloc(size_t sz, const char* file, long line) {
         global_stats.fail_size += sz;
         return NULL;
     }
+    // 计算总大小
     size_t total_size = sz + sizeof(int);
 
     void* ptr = base_malloc(total_size);
@@ -84,6 +95,7 @@ void* dmalloc(size_t sz, const char* file, long line) {
     }
 
     int pattern = 114514;  // 设定一个已知的模式值
+    // 用memcpy强制写入，防止未对齐访问
     memcpy((char*)ptr + sz, &pattern, sizeof(pattern));
     return ptr;
 }
@@ -102,9 +114,7 @@ void* dmalloc(size_t sz, const char* file, long line) {
 void dfree(void* ptr, const char* file, long line) {
     (void)file, (void)line;  // avoid uninitialized variable warnings
     // Your code here.
-    if (!ptr) {
-        return;
-    }
+    if (!ptr) return;
 
     // not in heap
     if (ptr < (void*)global_stats.heap_min ||
@@ -115,6 +125,7 @@ void dfree(void* ptr, const char* file, long line) {
     }
 
     // not allocated
+    // 大的if不能省略，主要是性能优化
     if (!find_allocation(ptr)) {
         // 查找包含该指针的块
         void* containing_ptr = find_allocation_containing(ptr);
@@ -150,7 +161,7 @@ void dfree(void* ptr, const char* file, long line) {
     }
 
     // boundary error
-    size_t sz = get_allocation_size(ptr);  // have a question???
+    size_t sz = get_allocation_size(ptr);
     int pattern = 114514;
     if (memcmp((char*)ptr + sz, &pattern, sizeof(pattern)) != 0) {
         fprintf(stderr,
@@ -161,7 +172,7 @@ void dfree(void* ptr, const char* file, long line) {
 
     global_stats.nactive--;
     global_stats.active_size -= get_allocation_size(ptr);
-    set_free(ptr);
+    set_free(ptr);  // 设置内存块未使用
     base_free(ptr);
 }
 /**
@@ -181,6 +192,7 @@ void dfree(void* ptr, const char* file, long line) {
  */
 void* dcalloc(size_t nmemb, size_t sz, const char* file, long line) {
     // Your code here (to fix test014).
+    // 注意溢出，所以把nmemb放在后面
     if (nmemb && sz > (SIZE_MAX) / nmemb) {
         global_stats.nfail++;
         global_stats.fail_size += sz;
@@ -229,6 +241,7 @@ void print_statistics() {
  */
 void print_leak_report() {
     // Your code here.
+    // 遍历哈希表，输出所有未释放的内存块
     for (auto& it : allocated_blocks) {
         if (!it.second.in_use) continue;
         void* ptr = it.first;
